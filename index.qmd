@@ -1,0 +1,574 @@
+---
+title: How frequently revisited sites differ between individuals and the sex of the spotted nutcracker in Davos
+subtitle: Project for Patterns and Trends in Environmental Data - 2025
+author: Simon Behringer and Marius King
+format:
+  html:
+    code-fold: true
+execute:
+  warning: false
+  message: false
+lang: en  # switch to "de" if you write your report in german
+bibliography: bibliography.bib
+---
+
+```{r load libraries}
+#| code-summary: "Code: load libraries"
+pacman::p_load(
+  adehabitatHR,
+  cluster,
+  dplyr,
+  forcats,
+  ggplot2,
+  ggpubr,
+  ggridges,
+  knitr,
+  lubridate,
+  multcompView,
+  patchwork,
+  pacman,
+  pracma,
+  purrr,
+  readr,
+  recurse,
+  sf,
+  terra,
+  tidyr,
+  viridis
+)
+
+
+set.seed(123)
+```
+
+```{r setup ggplot theme}
+#| code-summary: "Code: setup ggplot theme"
+theme_set(
+  theme_bw()
+)
+
+scale_lv95_axes <- function() {
+  list(
+    scale_x_continuous(
+      limits = c(2781000, 2789000),
+      minor_breaks = c(2781000, 2783000, 2785000, 2787000, 2789000),
+      breaks = c(2782000, 2784000, 2786000, 2788000)
+    ),
+    scale_y_continuous(
+      limits = c(1185000, 1195000),
+      minor_breaks = c(1185000, 1187000, 1189000, 1191000, 1193000, 1195000),
+      breaks = c(1186000, 1188000, 1190000, 1192000, 1194000)
+    ),
+    coord_sf(
+      datum = st_crs(2056),
+      expand = F
+    ),
+    theme(
+      axis.text.x = element_text(angle = 45, hjust = 1),
+    )
+  )
+}
+
+scale_animal_id <- function() {
+  list(
+    scale_color_brewer(
+      palette = "Spectral",
+      name = "animal id",
+    ),
+    scale_fill_brewer(
+      palette = "Spectral",
+      name = "animal id",
+    )
+  )
+}
+
+scale_animal_sex <- function() {
+  list(
+    scale_fill_brewer(
+      palette = "Spectral",
+      name = "animal sex",
+      labels = c("female","male")
+    ),
+    scale_color_brewer(
+      palette = "Spectral",
+      name = "animal sex",
+      labels = c("female","male")
+    )
+  )
+}
+
+```
+
+```{r preprocessing}
+#| code-summary: "Code: preprocessing"
+
+background <- png::readPNG("data/swissimage2.5m_latest.png")   
+
+spotted_nutcrackers_ref_data <- read_delim("data/reference_data_spotted_nutcrackers.csv") |>
+  mutate(across(where(is.character), as.factor)) |> 
+  mutate(
+    tag_id = factor(tag_id)
+  )
+
+spotted_nutcrackers_gps <- read_delim("data/gps_spotted_nutcrackers.csv") |>
+  mutate(
+    tag_local_identifier = factor(tag_local_identifier),
+    timestamp = as.POSIXct(timestamp, format = "%d/%m/%Y %H:%M"),
+    across(where(is.character), as.factor))
+
+spotted_nutcrackers <- left_join(
+  spotted_nutcrackers_gps,
+  spotted_nutcrackers_ref_data,
+  join_by(individual_local_identifier == animal_id)
+) |> 
+  st_as_sf(coords = c("location_long", "location_lat"),
+           crs = 4326) |>  # Setzt ursprüngliches CRS
+  st_transform(crs = 2056) |>  # Transformiert ins LV95
+  mutate(CH_X = st_coordinates(geometry)[, 1], # Extrahiert neue X-Koordinaten
+         CH_Y = st_coordinates(geometry)[, 2]) |>
+  st_drop_geometry()
+```
+
+## Background and Research Goals (simon)
+
+Nutcrackers (_Nucifraga caryocatactes_) play a crucial role in forest regeneration by dispersing seeds. Analyzing their movement data allows us to identify frequently revisited sites, which can provide insights into harvesting and caching behavior as well as dispersal distances. Understanding these movement patterns and their ecological implications is essential for forest conservation and management [@SorensenEtAl2022; @GrafEtAl2024].
+
+1.  How do frequently revisited sites vary among individuals, and can distinct clusters of these sites be identified?
+2.  Do revisited sites of individuals differ between males and females in terms of distance from each other?
+
+## Material and Methods
+
+### Study Area
+
+Both studies [@SorensenEtAl2022; @GrafEtAl2024] tracked spotted nutcracker movements in 2017 and 2018 within a ~15 km² area around Davos in the eastern Swiss Alps ([@fig-study-area]). In this region, Swiss stone pine (_Pinus cembra_) forms the upper treeline between 1850 and 2200 m a.s.l., with the highest densities at mid-elevations. Valley bottoms are dominated by Norway spruce (_Picea abies_) and European larch (_Larix decidua_), where Swiss stone pine is scarce.
+
+![Study Area around Davos](data/swissimage2.5m_latest.png){#fig-study-area fig-alt="Study Area around Davos" width="60%"}
+
+### Data
+
+The data used consists of two datasets: one containing GPS localizations with x/y coordinates, timestamps, and individual identifiers, and a reference dataset with additional information on each individual, such as sex, weight, and wingspan. In total, data from 31 individuals were recorded, tracked over varying time periods and at different temporal resolutions, with localization intervals ranging from 15 to 60 minutes.
+We only used data collected in the months of august and september in 2017 and 2018. Individuals were tracked between 10:00 and 20:00 with a 15 minute frequency. For the identification of the freqeuntly revisited sites, we used all gps localizations, for the analysis of the stepwidth only those with a time lag of 15 minutes to the previous localization.
+
+```{r data filtering}
+#| code-summary: "Code: data filtering"
+#| 
+spotted_nutcrackers_filter <- spotted_nutcrackers |> 
+  group_by(animal_ring_id) |> 
+  summarise(
+    count = n(),
+    start =first(timestamp),
+    last=last(timestamp),
+    duration = last - start 
+  ) |> 
+  filter(
+    duration > 5,
+    start |> year() %in% c(2017,2018),
+    last |> year() %in% c(2017,2018),
+    !animal_ring_id %in% c("K96915","K96934")
+  ) |> 
+  pull(animal_ring_id)
+
+spotted_nutcrackers_filtered <- spotted_nutcrackers |> 
+  filter(animal_ring_id %in% spotted_nutcrackers_filter) 
+```
+
+
+```{r}
+#| code-summary: "Code"
+#| label: tbl-data-ex
+#| tbl-cap: "excerpt of the data used"
+spotted_nutcrackers_filtered |> 
+  dplyr::select(animal_ring_id, timestamp, CH_X, CH_Y, animal_sex) |> 
+  head() |> 
+  kable()
+```
+
+### Method
+
+To identify highly revisited sites, we applied the workflow described by @SorensenEtAl2022, conducting a recursion analysis for each bird’s GPS locations using the R package `recurse` [@Bracis2018]. Each GPS point was treated as a potential revisitation site by defining a 250 m radius around it. We then counted the number of revisits, i.e., instances where a bird returned to the same site. The density distribution of revisits often exhibited a multi- or bimodal pattern. The lowest local minimum was used as a threshold to distinguish points with few or no revisits from frequently revisited points.
+
+```{r recursion analysis}
+#| code-summary: "Code: recursion analysis"
+find_local_minimum <- function(values) {
+  d <- density(values)
+  dy <- d$y
+  dx <- d$x
+  minima_idx <- which(diff(sign(diff(dy))) == 2) + 1
+  if (length(minima_idx) == 0) return(NA)
+  minima_x <- dx[minima_idx]
+
+  lowest_minimum <- minima_x |> min()
+  
+  return(lowest_minimum)
+}
+
+spotted_nutcrackers_recurse <- spotted_nutcrackers_filtered |>
+  group_by(animal_ring_id) |>
+  group_map(~ {
+    rec <- .x |> dplyr::select(CH_X, CH_Y, timestamp, individual_local_identifier) |> 
+      as.data.frame() |> 
+      getRecursions(radius = 250, timeunits = "mins")
+    rec$revisitStats
+  }) |> 
+  map_dfr(~ .x) |> 
+  group_by(id, coordIdx, x, y) |> 
+  summarise(revisits = n(), .groups = "drop") |> 
+  group_by(id) |> 
+  mutate(
+    threshold = find_local_minimum(revisits),
+    mean = mean(revisits),
+    median = median(revisits),
+    max_revisits = max(revisits),
+    freq_revisited = revisits >= threshold
+  ) |> 
+  ungroup() |> 
+  left_join(
+    spotted_nutcrackers_ref_data,
+    by = join_by(id == animal_id)
+  )
+
+```
+
+The frequently revisited points then underwent a spatial fuzzy cluster analysis. For each individual they were grouped into two distinct clusters using the R package `cluster` [@MaechlerEtAl2024]. If the two centorides of the two clusters were closer than 250 m together, they were combined into a single cluster. Extracting the 95% minimum convex polygon for each cluster using the `adehabitatHR` package [@Calenge2024] resulted in one or two frequently revisited sites for each bird.
+
+```{r clustering}
+#| code-summary: "Code: clustering"
+spotted_nutcrackers_points <- spotted_nutcrackers_recurse |> 
+  st_as_sf(coords = c("x", "y"), crs = 2056)
+
+spotted_nutcrackers_clustered_points <- spotted_nutcrackers_recurse |> 
+  filter( freq_revisited) |> 
+  dplyr::select(id, x, y, animal_sex,  freq_revisited) |> 
+  group_by(id) |> 
+  group_modify(~ {
+    coords <- dplyr::select(.x, x, y)
+
+    if (nrow(coords) < 2) {
+      .x$cluster <- NA
+    } else {
+      coords_sf <- st_as_sf(coords, coords = c("x", "y"), crs = 2056)
+      
+      pam_result <- pam(st_coordinates(coords_sf), k = 2)
+      .x$cluster <- pam_result$clustering
+
+      cluster_centroids <- coords_sf |>
+        mutate(cluster = .x$cluster) |>
+        group_by(cluster) |>
+        summarise(geometry = st_centroid(st_union(geometry))) |>
+        st_as_sf()
+
+      dist_between_clusters <- st_distance(cluster_centroids[1, ], cluster_centroids[2, ])
+
+      if (as.numeric(dist_between_clusters) <= 250) {
+        .x$cluster <- 1
+      }
+    }
+
+    return(.x)
+  }) |> 
+  ungroup() |> 
+  mutate(id_cluster = paste(id, cluster, sep = "_")) |> 
+  group_by(id_cluster) |> 
+  filter(n() >= 5) |> 
+  ungroup() |> 
+  st_as_sf(coords = c("x", "y"), crs = 2056) |> 
+  as("Spatial")
+```
+
+```{r extract 95% minimum convex polygon}
+#| code-summary: "Code: extract 95% minimum convex polygon"
+spotted_nutcrackers_clustered_mcp <- spotted_nutcrackers_clustered_points["id_cluster"] |> 
+  mcp(percent = 95) |> 
+  st_as_sf(crs = 2056) |> 
+  separate(id, into = c("id", "cluster"), sep = "_") |> 
+  arrange(area |> desc()) |> 
+  left_join(
+    spotted_nutcrackers_ref_data,
+    join_by(id==animal_id)
+  )
+```
+
+To quantify movement activity, we calculated the stepwidth (Euclidean distance in meters) between consecutive GPS locations for each individual. The stepwidth was computed using a custom function that calculates pairwise distances between subsequent locations. Additionally, the time lag between fixes was calculated in minutes, and only steps with a regular 15-minute interval were retained for analysis to ensure temporal consistency.
+
+```{r calc stepwidth}
+#| code-summary: "Code: calculate stepwidth"
+
+get_stepwidth = function(geometry, n = 1) {
+  st_distance(lag(geometry, n = n), geometry, by_element = TRUE) |> as.numeric()
+}
+
+get_timelag = function(datetime, n = 1, units = "secs") {
+  difftime(lead(datetime, n = n), datetime, units = units) |> as.numeric()
+}
+
+spotted_nutcrackers_stepwidth <- spotted_nutcrackers_filtered |> 
+  st_as_sf(coords = c("CH_X", "CH_Y"), crs = 2056) |> 
+  group_by(animal_ring_id) |>
+  mutate(
+    stepwidth = geometry |>  get_stepwidth(),
+    timelag = timestamp |> get_timelag(units="mins"),
+    speed_m_sec = stepwidth / (timelag * 60),
+    speed_km_h = speed_m_sec * 3.6
+  ) |> 
+  ungroup() |> 
+  dplyr::select(animal_ring_id, timestamp, stepwidth, timelag, animal_sex,animal_group_id) |> 
+  filter(timelag==15) |>
+  mutate(CH_X = st_coordinates(geometry)[, 1], 
+         CH_Y = st_coordinates(geometry)[, 2]) |>
+  st_drop_geometry()
+```
+
+To assess potential differences in movement behavior, we visualized stepwidth distributions with boxplots grouped by individuals and sex. We performed ANOVAs to test for significant differences in stepwidth between the individuals as well as males and females. Stepwidth therefore was transformed using the `log10` function.
+
+```{r anova}
+#| code-summary: "Code: Anova"
+spotted_nutcrackers_aov <- aov(log10(stepwidth)~animal_ring_id, data=spotted_nutcrackers_stepwidth)
+
+spotted_nutcrackers_tukey <- spotted_nutcrackers_aov |> TukeyHSD()
+spotted_nutcrackers_aov_letters <- multcompLetters4(
+  spotted_nutcrackers_aov,
+  spotted_nutcrackers_tukey
+)
+
+spotted_nutcrackers_aov_label <- data.frame(
+      animal_ring_id = names(spotted_nutcrackers_aov_letters$animal_ring_id$Letters),
+      group = spotted_nutcrackers_aov_letters$animal_ring_id$Letters |> factor(levels = c("a","ab","abc","bc","c"), ordered=T))
+
+
+spotted_nutcrackers_aov_sex <- aov(log10(stepwidth)~animal_sex, data=spotted_nutcrackers_stepwidth)
+```
+
+```{r}
+spotted_nutcrackers_points <- spotted_nutcrackers_points |> 
+  left_join(
+    spotted_nutcrackers_aov_label,
+    join_by(animal_ring_id)
+  ) |> 
+  mutate(
+    animal_ring_id = fct_reorder(animal_ring_id, group |> factor() |>  as.numeric())
+  )
+
+spotted_nutcrackers_stepwidth <- spotted_nutcrackers_stepwidth |> 
+  left_join(
+    spotted_nutcrackers_aov_label,
+    join_by(animal_ring_id)
+  ) |> 
+  mutate(
+    animal_ring_id = fct_reorder(animal_ring_id, group |> factor() |>  as.numeric())
+  )
+
+spotted_nutcrackers_clustered_mcp <- spotted_nutcrackers_clustered_mcp |> 
+  left_join(
+    spotted_nutcrackers_aov_label,
+    join_by(animal_ring_id)
+  ) |> 
+  mutate(
+    animal_ring_id = fct_reorder(animal_ring_id, group |> factor() |>  as.numeric())
+  )
+```
+
+
+## Results
+
+The threshold value for distinguishing GPS localizations with infrequent revisits from those with frequent revisits ranges from 11.9 to 45.2, depending on the individual and their density curve of the number of revitis per GPS localization from the recursion analysis ([@fig-nut-density]).
+
+```{r fig-nut-density, fig.width=10, fig.height=4}
+#| label: fig-nut-density
+#| fig-cap: "Density of revisitation of GPS licalizations per individual"
+spotted_nutcrackers_points |>   
+  ggplot(aes(revisits, fill=animal_sex)) +
+  geom_density() + 
+  facet_wrap(.~animal_ring_id, ncol=5,scales="free")+
+  geom_vline(
+    aes(xintercept = threshold),
+    color = "blue", linewidth = 0.5
+  )+
+  labs(
+    y="density"
+  )+
+  geom_text(
+    aes(
+      max_revisits/2,
+      0,
+      label = paste0("threshold: ",round(threshold, 1))
+    ),
+    color="blue",
+    vjust = -0.5, 
+    size = 3
+  )+
+  scale_animal_sex()
+```
+
+The visualization of the frequently revisited GPS localization already shows a distinct pattern of frequently revisited sites ([@fig-nut-indiv]). Clustering these points into two clusters and extracting the 95% minimum convex polygons for each individual results in two frequently revisited sites further than 250 meters apart for 9 out of 10 individuals. In one case, the two clusters are closer than 250 meters, so we identified only one frequently revisited location for this individual. All but one individual showed consistent revisits to one area in the southeast and another in the northeast or east.
+
+```{r fig-nut-indiv, fig.width=10, fig.height=5}
+#| label: fig-nut-indiv
+#| fig-cap: "Identified frequently revisited sites classfied by individuals as (A) points and (B) 95% minimum convex polygones"
+
+p1 <- ggplot()+
+  background_image(background)+
+  geom_sf(
+    aes(color=factor(animal_ring_id)),
+    data=spotted_nutcrackers_points |> 
+      filter(!freq_revisited),
+    alpha=0.2
+  )+
+  geom_sf(
+    aes(color=factor(animal_ring_id)), 
+    data=spotted_nutcrackers_points |> 
+      filter(freq_revisited)
+  )+
+  scale_animal_id() +
+  scale_lv95_axes()+
+  theme(legend.position = "none")
+
+p2 <- ggplot() +
+  background_image(background)+
+  geom_sf(
+    aes(color=factor(animal_ring_id)), 
+    data=spotted_nutcrackers_points |> 
+      filter(!freq_revisited),
+    alpha=0.2
+  )+
+  geom_sf(
+    aes(fill = factor(animal_ring_id)),
+    data=spotted_nutcrackers_clustered_mcp
+  ) +
+  scale_animal_id() +
+  scale_lv95_axes()
+
+
+p1 + 
+  p2 + 
+  plot_layout(widths = c(5,5)) + 
+  plot_annotation(tag_levels = "A")
+```
+
+[@fig-nut-sex] shows the same frequently revisited GPS locations, now grouped by animal sex. Both female and male individuals exhibit consistent use of distinct areas, particularly in the southeast and northeast of the study area. 
+
+```{r fig-nut-sex, fig.width=10, fig.height=5}
+#| label: fig-nut-sex
+#| fig-cap: "Identified frequently revisited sites classfied by animal sex as (A) points and (B) 95% minimum convex polygones"
+
+p3 <- ggplot()+
+  background_image(background)+
+  geom_sf(
+    aes(color=animal_sex), 
+    data= spotted_nutcrackers_points|> 
+      filter(!freq_revisited),
+    alpha=0.2
+  )+
+  geom_sf(
+    aes(color=animal_sex), 
+    data=spotted_nutcrackers_points |> 
+      filter(freq_revisited)
+  )+
+  scale_animal_sex()+
+  scale_lv95_axes()+
+  theme(legend.position = "none")
+
+p4 <- ggplot() +
+  background_image(background)+
+  geom_sf(
+    aes(color=animal_sex), 
+    data=spotted_nutcrackers_points |> 
+      filter(!freq_revisited),
+    alpha=0.2
+  )+
+  geom_sf(
+    aes(fill = factor(animal_sex)),
+    data=spotted_nutcrackers_clustered_mcp
+  ) +
+  scale_animal_sex()+
+  scale_lv95_axes()
+
+p3 + 
+  p4 + 
+  plot_layout(widths = c(5,5)) + 
+  plot_annotation(tag_levels = "A")
+
+```
+
+The analysis of variance indicates significant differences regarding stepwidth among individuals (*p* = 9.21e-11) as well as between sexes (*p* = 3.9e-05; [@fig-nut-box]), with female animals showing a slightly greater stepwidth than male.
+
+```{r fig-nut-box, fig.width=10, fig.height=5}
+#| label: fig-nut-box
+#| fig-cap: "Differences in stepwidth between (A) individuals indicated by the density of their stepwidth and group according to the ANOVA and (B) sex"
+
+p5 <- spotted_nutcrackers_stepwidth |> 
+  ggplot(aes(animal_ring_id,stepwidth,fill=animal_sex))+
+  geom_boxplot()+
+  stat_compare_means(method = "anova", label.x.npc = 0.41)+
+  scale_animal_sex()+
+  scale_y_log10()+
+  theme(
+    legend.position = "none",
+    axis.text.x = element_text(angle = 45, hjust = 1),
+  )+
+  labs(
+    x="animal id"
+  )+
+  geom_text(data = spotted_nutcrackers_aov_label, aes(x = animal_ring_id, y = 7500, label = group),
+            inherit.aes = FALSE, size = 4)
+
+p6 <-spotted_nutcrackers_stepwidth |> 
+  ggplot(aes(animal_sex,stepwidth,fill=animal_sex))+
+  geom_boxplot()+
+  stat_compare_means(method = "anova", label.x.npc = 0.05)+
+  scale_animal_sex()+
+  scale_y_log10()+
+  labs(
+    x="animal sex"
+  )
+
+p7 <- spotted_nutcrackers_stepwidth |> 
+  ggplot(aes(x = stepwidth, 
+             y = animal_ring_id |> fct_rev(), 
+             fill = animal_sex)) +
+  geom_density_ridges(scale=1) + 
+  geom_text(data = spotted_nutcrackers_aov_label, aes(x = 1, y = animal_ring_id, label = group),
+            inherit.aes = FALSE, size = 4)+
+  labs(
+    y="density per individual"
+  )+
+  scale_x_log10(
+    limits=c(1,20000),
+    breaks=c(1,10,100,1000,10000)
+  )+
+  scale_fill_brewer(
+    palette = "Spectral",
+    name = "animal sex",
+    labels = c("female","male")
+  )+
+  theme(
+    legend.position = "none"
+  )+ 
+  expand_limits(y = length(unique(spotted_nutcrackers_stepwidth$animal_ring_id)) + 2)
+
+p7 + 
+  p6 +
+  plot_layout(widths = c(7.5,2.5)) + 
+  plot_annotation(tag_levels = "A")
+
+```
+
+
+## Discussion (simon)
+
+
+## References
+
+::: {#refs}
+:::
+
+
+## Appendix
+
+### Wordcount
+
+<!-- after installing the wordcountadding, remove the line "#| eval: false" -->
+
+```{r}
+#| eval: false
+wordcountaddin:::text_stats()
+```
