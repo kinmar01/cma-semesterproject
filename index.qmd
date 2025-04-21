@@ -3,13 +3,17 @@ title: How frequently revisited sites differ between individuals and the sex of 
 subtitle: Project for Patterns and Trends in Environmental Data - 2025
 author: Simon Behringer and Marius King
 format:
-  html:
+  html:           
+    toc: true 
+    toc-depth: 2
+    embed-resources: true
     code-fold: true
 execute:
   warning: false
   message: false
 lang: en  # switch to "de" if you write your report in german
 bibliography: bibliography.bib
+output-file: index
 ---
 
 ```{r load libraries}
