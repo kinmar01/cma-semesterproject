@@ -1,0 +1,9 @@
+project:
+  output-dir: "docs"
+format:
+  html:           
+    toc: true 
+    toc-depth: 2
+    embed-resources: true
+    code-fold: true
+    theme: journal

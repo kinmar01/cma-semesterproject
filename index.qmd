@@ -2,12 +2,6 @@
 title: How frequently revisited sites differ between individuals and the sex of the spotted nutcracker in Davos
 subtitle: Project for Patterns and Trends in Environmental Data - 2025
 author: Simon Behringer and Marius King
-format:
-  html:           
-    toc: true 
-    toc-depth: 2
-    embed-resources: true
-    code-fold: true
 execute:
   warning: false
   message: false
@@ -38,7 +32,8 @@ pacman::p_load(
   sf,
   terra,
   tidyr,
-  viridis
+  viridis,
+  wordcountadding
 )
 
 
@@ -500,36 +495,10 @@ The analysis of variance indicates significant differences regarding stepwidth a
 #| fig-cap: "Differences in stepwidth between (A) individuals indicated by the density of their stepwidth and group according to the ANOVA and (B) sex"
 
 p5 <- spotted_nutcrackers_stepwidth |> 
-  ggplot(aes(animal_ring_id,stepwidth,fill=animal_sex))+
-  geom_boxplot()+
-  stat_compare_means(method = "anova", label.x.npc = 0.41)+
-  scale_animal_sex()+
-  scale_y_log10()+
-  theme(
-    legend.position = "none",
-    axis.text.x = element_text(angle = 45, hjust = 1),
-  )+
-  labs(
-    x="animal id"
-  )+
-  geom_text(data = spotted_nutcrackers_aov_label, aes(x = animal_ring_id, y = 7500, label = group),
-            inherit.aes = FALSE, size = 4)
-
-p6 <-spotted_nutcrackers_stepwidth |> 
-  ggplot(aes(animal_sex,stepwidth,fill=animal_sex))+
-  geom_boxplot()+
-  stat_compare_means(method = "anova", label.x.npc = 0.05)+
-  scale_animal_sex()+
-  scale_y_log10()+
-  labs(
-    x="animal sex"
-  )
-
-p7 <- spotted_nutcrackers_stepwidth |> 
   ggplot(aes(x = stepwidth, 
              y = animal_ring_id |> fct_rev(), 
              fill = animal_sex)) +
-  geom_density_ridges(scale=1) + 
+  geom_density_ridges(scale=2) + 
   geom_text(data = spotted_nutcrackers_aov_label, aes(x = 1, y = animal_ring_id, label = group),
             inherit.aes = FALSE, size = 4)+
   labs(
@@ -549,7 +518,17 @@ p7 <- spotted_nutcrackers_stepwidth |>
   )+ 
   expand_limits(y = length(unique(spotted_nutcrackers_stepwidth$animal_ring_id)) + 2)
 
-p7 + 
+p6 <-spotted_nutcrackers_stepwidth |> 
+  ggplot(aes(animal_sex,stepwidth,fill=animal_sex))+
+  geom_boxplot()+
+  stat_compare_means(method = "anova", label.x.npc = 0.05)+
+  scale_animal_sex()+
+  scale_y_log10()+
+  labs(
+    x="animal sex"
+  )
+
+p5 + 
   p6 +
   plot_layout(widths = c(7.5,2.5)) + 
   plot_annotation(tag_levels = "A")
