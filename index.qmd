@@ -591,4 +591,4 @@ wordcountaddin:::text_stats()
 |Sentence count  |97          |Not available |
 |Reading time    |8.2 minutes |8.1 minutes   |
 
-: Word and character count using the `wordcountaddin` {#tbl-word-count}
+: Word and character count using wordcountaddin {#tbl-word-count}
