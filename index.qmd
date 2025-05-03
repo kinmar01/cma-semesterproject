@@ -562,7 +562,7 @@ The clustering analysis also revealed clear spatial differences between frequent
 
 Such behavioral differences are rarely explored in detail in the literature but offer important avenues for further research. A deeper understanding of these differences could help clarify how such behaviors influence regeneration and the long-term stability of plant populations.
 
-## Conclustion
+## Conclusion
 
 Assessing the ecological implications of frequently visited sites remains a challenge. While GPS data provide valuable insights into nutcracker movements, it is difficult, for example, to evaluate cache quality or seedling success at these locations. Similar to earlier work that emphasized the need for stable isotope analysis or genetic methods to link seeds to parent trees, the integration of such data in future studies could help develop a more comprehensive picture of ecological dynamic.
 
