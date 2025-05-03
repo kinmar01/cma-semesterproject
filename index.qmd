@@ -32,9 +32,9 @@ pacman::p_load(
   sf,
   terra,
   tidyr,
-  viridis,
-  wordcountadding
+  viridis
 )
+pacman::p_install_gh("benmarwick/wordcountaddin")
 
 
 set.seed(123)
@@ -580,15 +580,8 @@ Overall, the results of this study demonstrate how innovative tracking methods c
 <!-- after installing the wordcountadding, remove the line "#| eval: false" -->
 
 ```{r}
-#| eval: false
-wordcountaddin:::text_stats()
+#| label: tbl-word-count
+#| tbl-cap: "Word and character count using wordcountaddin"
+wordcountaddin:::text_stats("index.qmd")
 ```
 
-|Method          |koRpus      |stringi       |
-|:---------------|:-----------|:-------------|
-|Word count      |1641        |1621          |
-|Character count |11423       |11421         |
-|Sentence count  |97          |Not available |
-|Reading time    |8.2 minutes |8.1 minutes   |
-
-: Word and character count using wordcountaddin {#tbl-word-count}
