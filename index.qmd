@@ -128,29 +128,32 @@ spotted_nutcrackers <- left_join(
   st_drop_geometry()
 ```
 
-## Background and Research Goals (simon)
+## Background and Research Goals
 
-Nutcrackers (_Nucifraga caryocatactes_) play a crucial role in forest regeneration by dispersing seeds. Analyzing their movement data allows us to identify frequently revisited sites, which can provide insights into harvesting and caching behavior as well as dispersal distances. Understanding these movement patterns and their ecological implications is essential for forest conservation and management [@SorensenEtAl2022; @GrafEtAl2024].
+More than 70% of the world’s woody plant species rely on animals for seed dispersal [@jordano2003]. Birds play a central role in this process, as their high mobility allows them to transport seeds over long distances [@fandos2023]. Previous studies on animal-mediated seed dispersal have primarily focused on interspecific differences and used morphological traits such as body size or wing length to explain variations in dispersal distances [@boehning-gaese2006; @li2018]. Such trait-based approaches allow for predictions of seed dispersal at the species or community level [@jordano2003; @schleuning2015; @buchholz2019].
 
-1.  How do frequently revisited sites vary among individuals, and can distinct clusters of these sites be identified?
-2.  Do revisited sites of individuals differ between males and females in terms of distance from each other?
+More recently, however, increasing emphasis has been placed on including individual differences within a species—particularly behavioural traits—in seed dispersal studies [@zwolak2020]. Studies have shown that individuals within a population can differ consistently in their behaviour, which may influence the effectiveness of seed dispersal [@dall2004; @wolf2012]. For example, an animal’s personality—such as its boldness—can determine whether it acts as a seed predator or a seed disperser [@brehm2022].
+
+Spotted nutcrackers (*Nucifraga caryocatactes*) are corvids that maintain a mutualistic relationship with the Swiss stone pine (*Pinus cembra*). In late summer, they harvest the ripe seeds and cache them in the ground as food reserves, thereby playing a key role in the regeneration of the tree species [@mattes1982; @neuschulz2015]. GPS tracking data from these birds make it possible to identify frequently visited locations and draw conclusions about individual harvesting and caching behaviours [@hertel2020; @auffret2017; @GrafEtAl2024]. The aim of this study is to analyse GPS movement data from individual spotted nutcrackers in the Swiss Alps to address the following research questions:
+
+1.  How do frequently visited sites differ between individuals, and can spatial clusters be identified?
+2.  Do visitation patterns differ between male and female birds in terms of their spatial distribution?
 
 ## Material and Methods
 
 ### Study Area
 
-Both studies [@SorensenEtAl2022; @GrafEtAl2024] tracked spotted nutcracker movements in 2017 and 2018 within a ~15 km² area around Davos in the eastern Swiss Alps ([@fig-study-area]). In this region, Swiss stone pine (_Pinus cembra_) forms the upper treeline between 1850 and 2200 m a.s.l., with the highest densities at mid-elevations. Valley bottoms are dominated by Norway spruce (_Picea abies_) and European larch (_Larix decidua_), where Swiss stone pine is scarce.
+Both studies [@SorensenEtAl2022; @GrafEtAl2024] tracked spotted nutcracker movements in 2017 and 2018 within a \~15 km² area around Davos in the eastern Swiss Alps ([@fig-study-area]). In this region, Swiss stone pine (*Pinus cembra*) forms the upper treeline between 1850 and 2200 m a.s.l., with the highest densities at mid-elevations. Valley bottoms are dominated by Norway spruce (*Picea abies*) and European larch (*Larix decidua*), where Swiss stone pine is scarce.
 
 ![Study Area around Davos](data/swissimage2.5m_latest.png){#fig-study-area fig-alt="Study Area around Davos" width="60%"}
 
 ### Data
 
-The data used consists of two datasets: one containing GPS localizations with x/y coordinates, timestamps, and individual identifiers, and a reference dataset with additional information on each individual, such as sex, weight, and wingspan. In total, data from 31 individuals were recorded, tracked over varying time periods and at different temporal resolutions, with localization intervals ranging from 15 to 60 minutes.
-We only used data collected in the months of august and september in 2017 and 2018. Individuals were tracked between 10:00 and 20:00 with a 15 minute frequency. For the identification of the freqeuntly revisited sites, we used all gps localizations, for the analysis of the stepwidth only those with a time lag of 15 minutes to the previous localization.
+The data used consists of two datasets: one containing GPS localizations with x/y coordinates, timestamps, and individual identifiers, and a reference dataset with additional information on each individual, such as sex, weight, and wingspan. In total, data from 31 individuals were recorded, tracked over varying time periods and at different temporal resolutions, with localization intervals ranging from 15 to 60 minutes. We only used data collected in the months of august and september in 2017 and 2018. Individuals were tracked between 10:00 and 20:00 with a 15 minute frequency. For the identification of the freqeuntly revisited sites, we used all gps localizations, for the analysis of the stepwidth only those with a time lag of 15 minutes to the previous localization.
 
 ```{r data filtering}
 #| code-summary: "Code: data filtering"
-#| 
+
 spotted_nutcrackers_filter <- spotted_nutcrackers |> 
   group_by(animal_ring_id) |> 
   summarise(
@@ -170,7 +173,6 @@ spotted_nutcrackers_filter <- spotted_nutcrackers |>
 spotted_nutcrackers_filtered <- spotted_nutcrackers |> 
   filter(animal_ring_id %in% spotted_nutcrackers_filter) 
 ```
-
 
 ```{r}
 #| code-summary: "Code"
@@ -366,14 +368,13 @@ spotted_nutcrackers_clustered_mcp <- spotted_nutcrackers_clustered_mcp |>
   )
 ```
 
-
 ## Results
 
 The threshold value for distinguishing GPS localizations with infrequent revisits from those with frequent revisits ranges from 11.9 to 45.2, depending on the individual and their density curve of the number of revitis per GPS localization from the recursion analysis ([@fig-nut-density]).
 
-```{r fig-nut-density, fig.width=10, fig.height=4}
+```{r fig.width=10, fig.height=4}
 #| label: fig-nut-density
-#| fig-cap: "Density of revisitation of GPS licalizations per individual"
+#| fig-cap: "Density of revisitation of GPS localizations per individual"
 spotted_nutcrackers_points |>   
   ggplot(aes(revisits, fill=animal_sex)) +
   geom_density() + 
@@ -400,7 +401,7 @@ spotted_nutcrackers_points |>
 
 The visualization of the frequently revisited GPS localization already shows a distinct pattern of frequently revisited sites ([@fig-nut-indiv]). Clustering these points into two clusters and extracting the 95% minimum convex polygons for each individual results in two frequently revisited sites further than 250 meters apart for 9 out of 10 individuals. In one case, the two clusters are closer than 250 meters, so we identified only one frequently revisited location for this individual. All but one individual showed consistent revisits to one area in the southeast and another in the northeast or east.
 
-```{r fig-nut-indiv, fig.width=10, fig.height=5}
+```{r fig.width=10, fig.height=5}
 #| label: fig-nut-indiv
 #| fig-cap: "Identified frequently revisited sites classfied by individuals as (A) points and (B) 95% minimum convex polygones"
 
@@ -443,9 +444,9 @@ p1 +
   plot_annotation(tag_levels = "A")
 ```
 
-[@fig-nut-sex] shows the same frequently revisited GPS locations, now grouped by animal sex. Both female and male individuals exhibit consistent use of distinct areas, particularly in the southeast and northeast of the study area. 
+[@fig-nut-sex] shows the same frequently revisited GPS locations, now grouped by animal sex. Both female and male individuals exhibit consistent use of distinct areas, particularly in the southeast and northeast of the study area.
 
-```{r fig-nut-sex, fig.width=10, fig.height=5}
+```{r fig.width=10, fig.height=5}
 #| label: fig-nut-sex
 #| fig-cap: "Identified frequently revisited sites classfied by animal sex as (A) points and (B) 95% minimum convex polygones"
 
@@ -490,7 +491,7 @@ p3 +
 
 The analysis of variance indicates significant differences regarding stepwidth among individuals (*p* = 9.21e-11) as well as between sexes (*p* = 3.9e-05; [@fig-nut-box]), with female animals showing a slightly greater stepwidth than male.
 
-```{r fig-nut-box, fig.width=10, fig.height=5}
+```{r fig.width=10, fig.height=5}
 #| label: fig-nut-box
 #| fig-cap: "Differences in stepwidth between (A) individuals indicated by the density of their stepwidth and group according to the ANOVA and (B) sex"
 
@@ -535,15 +536,42 @@ p5 +
 
 ```
 
+## Discussion
 
-## Discussion (simon)
+With the exception of one individual, all nutcrackers showed recurring presence patterns in one area in the southeast and another in the northeast or east. For this reason, we focused our analysis on ten individuals. A limitation of the study is the small sample size, which restricts the ability to draw broadly generalizable conclusions. Nevertheless, the results reveal interesting trends that provide valuable starting points for future research.
 
+The findings of this study offer new insights into the movement patterns of Eurasian nutcrackers (*Nucifraga caryocatactes*), particularly with regard to individual and sex-specific behaviors. The combination of recursive analysis, spatial clustering, and GPS tracking technology made it possible to identify frequently visited sites and thereby better understand individual spatial movement patterns. These methods highlight the importance of fine-scale spatial data for analyzing intraspecific differences.
+
+Since all derived movement parameters — such as speed, directional changes, or path curvature — are strongly influenced by the chosen sampling rate @LaubePurves2011, the 15-minute interval used allows for relatively precise analysis.
+
+### Individually scaled threshold values for identifying frequently visited sites
+
+The threshold values used to identify frequently visited sites were scaled individually (based on the density distribution of revisits per location), limiting comparability between individuals due to the use of different thresholds. A location with 20 revisits may be classified as “frequently visited” for one individual but not for another. This, however, enables a more realistic and individualized assessment of movement behavior, as animals can differ greatly in how intensively they use certain locations. It is therefore important to interpret the results with the understanding that “frequently visited” is a relative, not absolute, measure depending on individual behavior.
+
+Furthermore, not all frequently visited locations show high revisit density. This suggests that the functionality of these sites varies and could depend on factors such as habitat quality, accessibility, and ecological conditions. These findings underscore the complexity of movement behavior, which cannot be fully described by revisit frequency alone.
+
+### Frequently visited sites differ between individuals, and spatial clusters can be identified
+
+We observed considerable variation in the spatial behavior of individuals. The frequently visited sites of individuals K125866, K125895, and K125874 were located around Lake Davos, while K125854, K125864, and K94634 primarily used the southern pine forest. This reflects not only individual differences in movement behavior, but also allowed us to identify spatial clusters.
+
+Further interpretation of the ecological relevance of these clusters remains speculative due to limited data. However, the individual differences provide valuable insights into habitat preferences and the related ecological interactions. These differences may be influenced by factors such as food availability, avoidance of competition, or proximity to preferred breeding sites, offering meaningful directions for future studies on nutcracker space use.
+
+### Spatial distribution differences between males and females
+
+The clustering analysis also revealed clear spatial differences between frequently visited sites. Females showed a slightly greater average stepwidth than males (p = 3.9e-05; @fig-nut-box). However, the analysis is based on GPS data with a limited temporal resolution (15-minute intervals), which means movements occurring within these intervals were not captured. For deeper understanding, additional contextual information such as habitat data, seasonal patterns, or the reproductive status of individuals would be valuable.
+
+Such behavioral differences are rarely explored in detail in the literature but offer important avenues for further research. A deeper understanding of these differences could help clarify how such behaviors influence regeneration and the long-term stability of plant populations.
+
+## Conclustion
+
+Assessing the ecological implications of frequently visited sites remains a challenge. While GPS data provide valuable insights into nutcracker movements, it is difficult, for example, to evaluate cache quality or seedling success at these locations. Similar to earlier work that emphasized the need for stable isotope analysis or genetic methods to link seeds to parent trees, the integration of such data in future studies could help develop a more comprehensive picture of ecological dynamic.
+
+Overall, the results of this study demonstrate how innovative tracking methods can be combined with classical ecological theory to better understand the role of nutcrackers in forest regeneration.
 
 ## References
 
 ::: {#refs}
 :::
-
 
 ## Appendix
 
@@ -555,3 +583,12 @@ p5 +
 #| eval: false
 wordcountaddin:::text_stats()
 ```
+
+|Method          |koRpus      |stringi       |
+|:---------------|:-----------|:-------------|
+|Word count      |1641        |1621          |
+|Character count |11423       |11421         |
+|Sentence count  |97          |Not available |
+|Reading time    |8.2 minutes |8.1 minutes   |
+
+: Word and character count using the ´wordcountaddin´ {#tbl-word-count}
